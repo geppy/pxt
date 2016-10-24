@@ -3381,18 +3381,31 @@ function buildCoreAsync(buildOpts: BuildCoreOptions): Promise<pxtc.CompileOption
 
             switch (buildOpts.mode) {
                 case BuildOption.GenDocs:
-                    let apiInfo = pxtc.getApiInfo(res.ast)
+                    const apiInfo = pxtc.getApiInfo(res.ast)
+                    const apis: Map<string> = {};
                     // keeps apis from this module only
-                    for (let infok in apiInfo.byQName) {
-                        let info = apiInfo.byQName[infok];
+                    for (const infok in apiInfo.byQName) {
+                        const info = apiInfo.byQName[infok];
                         if (info.pkg &&
                             info.pkg != mainPkg.config.name) delete apiInfo.byQName[infok];
+                        else {
+                            if ((info.kind == pxtc.SymbolKind.Method
+                                || info.kind == pxtc.SymbolKind.EnumMember)) {
+                                // TODO: filter out instance methods
+                                const code = 
+                                    `${info.namespace}.${info.name}${pxtc.renderParameters(apiInfo, info, '', 'null')};`
+                                apis[infok] = code;
+                            }
+                        }
                     }
                     let md = pxtc.genMarkdown(mainPkg.config.name, apiInfo, {
                         package: mainPkg.config.name != pxt.appTarget.corepkg,
                         locs: buildOpts.locs,
                         docs: buildOpts.docs
                     })
+                    const apiTestDir = "../../tests";
+                    nodeutil.mkdirP(apiTestDir)
+                    mainPkg.host().writeFile(mainPkg, `${apiTestDir}/api-${mainPkg.config.name}.ts`, pxt.Util.values(apis).sort().join('\n'))
                     mainPkg.host().writeFile(mainPkg, "built/apiinfo.json", JSON.stringify(apiInfo, null, 1))
                     for (let fn in md) {
                         let folder = /strings.json$/.test(fn) ? "_locales/" : /\.md$/.test(fn) ? "../../docs/" : "built/";
@@ -3508,8 +3521,8 @@ export function buildAsync(arg?: string) {
 export function gendocsAsync(...args: string[]) {
     return buildCoreAsync({
         mode: BuildOption.GenDocs,
-        docs: args.length == 0 || args.indexOf("--docs") > -1,
-        locs: args.length == 0 || args.indexOf("--locs") > -1
+        docs: args.indexOf("--docs") > -1,
+        locs: args.indexOf("--locs") > -1
     })
         .then((compileOpts) => { });
 }

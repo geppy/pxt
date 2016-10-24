@@ -59,8 +59,8 @@ namespace ts.pxtc {
         isTypeLocation: boolean;
     }
 
-    export const placeholderChar = "◊";
-    export const defaultImgLit = `
+    export const PLACE_HOLDER_CHAR = "◊";
+    export const DEFAULT_IMG_LIT = `
 . . . . .
 . . . . .
 . . # . .
@@ -76,7 +76,7 @@ namespace ts.pxtc {
         return n ? Util.capitalize(n.split('.')[0]) : undefined;
     }
 
-    function renderDefaultVal(apis: pxtc.ApisInfo, p: pxtc.ParameterDesc, imgLit: boolean, cursorMarker: string): string {
+    function renderDefaultVal(apis: pxtc.ApisInfo, p: pxtc.ParameterDesc, imgLit: boolean, cursorMarker: string, placeHolderChar: string): string {
         if (p.initializer) return p.initializer
         if (p.defaults) return p.defaults[0]
         if (p.type == "number") return "0"
@@ -84,7 +84,7 @@ namespace ts.pxtc {
         else if (p.type == "string") {
             if (imgLit) {
                 imgLit = false
-                return "`" + defaultImgLit + cursorMarker + "`";
+                return "`" + DEFAULT_IMG_LIT + cursorMarker + "`";
             }
             return `"${cursorMarker}"`
         }
@@ -97,15 +97,15 @@ namespace ts.pxtc {
         let m = /^\((.*)\) => (.*)$/.exec(p.type)
         if (m)
             return `(${m[1]}) => {\n    ${cursorMarker}\n}`
-        return placeholderChar;
+        return placeHolderChar;
     }
 
-    export function renderParameters(apis: pxtc.ApisInfo, si: SymbolInfo, cursorMarker: string = ''): string {
+    export function renderParameters(apis: pxtc.ApisInfo, si: SymbolInfo, cursorMarker: string = '', placeHolderChar = PLACE_HOLDER_CHAR): string {
         if (si.parameters) {
             let imgLit = !!si.attributes.imageLiteral
             return "(" + si.parameters
                 .filter(p => !p.initializer)
-                .map(p => renderDefaultVal(apis, p, imgLit, cursorMarker)).join(", ") + ")"
+                .map(p => renderDefaultVal(apis, p, imgLit, cursorMarker, placeHolderChar)).join(", ") + ")"
         }
         return '';
     }
