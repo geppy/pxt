@@ -574,7 +574,7 @@ function travisAsync() {
                 }
                 let trg = readLocalPxTarget()
                 if (rel)
-                    return preCacheHexAsync()
+                    return  Promise.resolve() //preCacheHexAsync()
                         .then(() => uploadTargetAsync(trg.id + "/" + rel))
                         .then(() => npmPublish ? runNpmAsync("publish") : Promise.resolve())
                         .then(() => uploadTargetTranslationsAsync())
@@ -1479,7 +1479,7 @@ function buildSemanticUIAsync() {
         cmd: "node",
         args: ["node_modules/less/bin/lessc", "theme/style.less", "built/web/semantic.css", "--include-path=node_modules/semantic-ui-less:node_modules/pxt-core/theme:theme/foo/bar"]
     }).then(() => {
-        let fontFile = fs.readFileSync("node_modules/semantic-ui-less/themes/default/assets/fonts/icons.woff2")
+        let fontFile = fs.readFileSync("node_modules/semantic-ui-less/themes/default/assets/fonts/icons.woff")
         let url = "url(data:application/font-woff;charset=utf-8;base64,"
             + fontFile.toString("base64") + ") format('woff')"
         let semCss = fs.readFileSync('built/web/semantic.css', "utf8")
@@ -1678,9 +1678,20 @@ export function serveAsync(...args: string[]) {
         return trimmedArgs && trimmedArgs.length && trimmedArgs.indexOf(arg) !== -1;
     };
 
+    let argValue = (arg: string): string => {
+        if (trimmedArgs && trimmedArgs.length) {
+            const i = trimmedArgs.indexOf(arg);
+            if (i !== -1 && i < trimmedArgs.length - 1) {
+                return trimmedArgs[i + 1];
+            }
+        }
+        return undefined;
+    };
+
     let justServe = false
     let packaged = false
     let includeSourceMaps = false;
+    let browser: string = argValue("browser");
 
     if (hasArg("yt")) {
         forceCloudBuild = false
@@ -1724,7 +1735,8 @@ export function serveAsync(...args: string[]) {
             localToken: localToken,
             autoStart: !globalConfig.noAutoStart,
             packaged: packaged,
-            electron: hasArg("electron")
+            electron: hasArg("electron"),
+            browser
         }))
 }
 
@@ -2077,10 +2089,6 @@ pxt_modules
         "isTestCommand": true,
         "problemMatcher": "$tsc",
         "args": ["build"]
-    }, {
-        "taskName": "publish",
-        "problemMatcher": "$tsc",
-        "args": ["publish"]
     }]
 }
 `
@@ -3560,7 +3568,17 @@ export interface SavedProject {
     files: Map<string>;
 }
 
-export function extractAsync(filename: string) {
+export function extractAsync(...args: string[]) {
+    let vscode = false;
+    if (/--code/i.test(args[0])) {
+        vscode = true;
+        args.shift();
+    }
+    const filename = args[0];
+    if (!filename) {
+        console.error("Missing filename to extract");
+        return Promise.resolve();
+    }
     let oneFile = (src: string, editor: string) => {
         let files: any = {}
         files["main." + (editor || "td")] = src || ""
@@ -3663,6 +3681,14 @@ export function extractAsync(filename: string) {
                     nodeutil.mkdirP(path.dirname(fullname))
                     fs.writeFileSync(fullname, defaultFiles[f])
                     console.log("wrote " + fullname)
+                }
+
+                // start installing in the background
+                child_process.exec(`pxt install`, { cwd: dirname });
+
+                if (vscode) {
+                    pxt.debug('launching code...')
+                    child_process.exec(`code -g main.ts ${dirname}`); // notice this without a callback..                    
                 }
             }
         })
@@ -3780,7 +3806,7 @@ cmd("testdir  DIR                 - compile files from DIR one-by-one", testDirA
 cmd("testconv JSONURL             - test TD->TS converter", testConverterAsync, 2)
 cmd("snippets [--re NAME] [--i]     - verifies that all documentation snippets compile to blocks", testSnippetsAsync)
 
-cmd("serve    [-yt]               - start web server for your local target; -yt = use local yotta build", serveAsync)
+cmd("serve [-yt] [-browser NAME]  - start web server for your local target; -yt = use local yotta build", serveAsync)
 cmd("update                       - update pxt-core reference and install updated version", updateAsync)
 cmd("buildtarget                  - build pxtarget.json", () => buildTargetAsync().then(() => { }), 1)
 cmd("bump                         - bump target or package version", bumpAsync)
