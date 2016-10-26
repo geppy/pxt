@@ -3388,7 +3388,7 @@ function buildCoreAsync(buildOpts: BuildCoreOptions): Promise<pxtc.CompileOption
                         const info = apiInfo.byQName[infok];
                         if (info.pkg &&
                             info.pkg != mainPkg.config.name) delete apiInfo.byQName[infok];
-                        else {
+                        else if(info.pkg) {
                             if ((info.kind == pxtc.SymbolKind.Method
                                 || info.kind == pxtc.SymbolKind.EnumMember)) {
                                 // TODO: filter out instance methods
