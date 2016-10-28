@@ -3902,6 +3902,30 @@ export function preCacheHexAsync() {
         });
 }
 
+export function gistPubAsync() {
+    return prepBuildOptionsAsync(BuildOption.Run)
+        .then(() => mainPkg.filesToBePublishedAsync())
+        .then(files => U.requestAsync({
+            url: "https://api.github.com/gists",
+            data: {
+                description: mainPkg.config.description,
+                public: false,
+                files: U.mapMap(files, (k, v) => ({ content: v }))
+            },
+            allowHttpErrors: true
+        }))
+        .then(gistResp => {
+            let id = gistResp.json.id
+            if (gistResp.statusCode != 201 || !id)
+                U.userError("Bad gist response: " + gistResp.statusCode)
+            let urls = {
+                githubUrl: "https://gist.github.com/anonymous/" + id,
+                loadHash: "#pub:gh/gists/" + id
+            }
+            console.log(urls)
+        })
+}
+
 interface Command {
     name: string;
     fn: () => void;
@@ -3966,6 +3990,7 @@ cmd("logout                       - clears access token", logoutAsync, 1)
 cmd("add      ARGUMENTS...        - add a feature (.asm, C++ etc) to package", addAsync)
 cmd("search   QUERY...            - search GitHub for a published package", searchAsync)
 cmd("pkginfo  USER/REPO           - show info about named GitHub packge", pkginfoAsync)
+cmd("gistpub                      - publish package as anonymous GitHub gist", gistPubAsync, 1)
 
 cmd("api      PATH [DATA]         - do authenticated API call", apiAsync, 1)
 cmd("pokecloud                    - same as 'api pokecloud {}'", () => apiAsync("pokecloud", "{}"), 2)
