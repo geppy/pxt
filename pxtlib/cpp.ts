@@ -469,8 +469,9 @@ namespace pxt.cpp {
             return outp
         }
 
-        let currSettings: Map<any> = {}
-        let settingSrc: Map<Package> = {}
+        const currSettings: Map<any> = {}
+        const optSettings: Map<any> = {}
+        const settingSrc: Map<Package> = {}
 
         function parseJson(pkg: Package) {
             let j0 = pkg.config.platformio
@@ -487,10 +488,10 @@ namespace pxt.cpp {
             }
 
             if (json.config) {
-                let cfg = U.jsonFlatten(json.config)
-                for (let settingName of Object.keys(cfg)) {
-                    let prev = U.lookup(settingSrc, settingName)
-                    let settingValue = cfg[settingName]
+                const cfg = U.jsonFlatten(json.config)
+                for (const settingName of Object.keys(cfg)) {
+                    const prev = U.lookup(settingSrc, settingName)
+                    const settingValue = cfg[settingName]
                     if (!prev || prev.config.yotta.configIsJustDefaults) {
                         settingSrc[settingName] = pkg
                         currSettings[settingName] = settingValue
@@ -504,6 +505,15 @@ namespace pxt.cpp {
                         err.settingName = settingName
                         throw err;
                     }
+                }
+            }
+
+            if (json.optionalConfig) {
+                const cfg = U.jsonFlatten(json.optionalConfig)
+                for (const settingName of Object.keys(cfg)) {
+                    const settingValue = cfg[settingName];
+                    // last one wins
+                    optSettings[settingName] = settingValue;
                 }
             }
         }
@@ -563,7 +573,9 @@ namespace pxt.cpp {
         if (allErrors)
             U.userError(allErrors)
 
-        res.yotta.config = U.jsonUnFlatten(currSettings)
+        // merge optional settings
+        U.jsonCopyFrom(optSettings, currSettings);
+        res.yotta.config = U.jsonUnFlatten(optSettings)
         let configJson = res.yotta.config
 
         if (isPlatformio) {
@@ -836,7 +848,7 @@ namespace pxt.hex {
     }
 
     function downloadHexInfoLocalAsync(extInfo: pxtc.ExtensionInfo): Promise<any> {
-        if (!Cloud.localToken || !window || !/^http:\/\/localhost/i.test(window.location.href)) {
+        if (!Cloud.localToken || !window || !Cloud.isLocalHost()) {
             return Promise.resolve();
         }
 
@@ -856,7 +868,7 @@ namespace pxt.hex {
 
     function apiAsync(path: string, data?: any) {
         return U.requestAsync({
-            url: "http://localhost:3232/api/" + path,
+            url: "/api/" + path,
             headers: { "Authorization": Cloud.localToken },
             method: data ? "POST" : "GET",
             data: data || undefined,
