@@ -603,6 +603,7 @@ namespace pxt.cpp {
         res.generatedFiles["/config.json"] = JSON.stringify(configJson, null, 4) + "\n"
         res.generatedFiles[sourcePath + "main.cpp"] = `
 #include "pxt.h"
+extern "C" {
 #ifdef PXT_MAIN
 PXT_MAIN
 #else
@@ -613,6 +614,7 @@ int main() {
     return 0; 
 }
 #endif
+}
 `
 
         let tmp = res.extensionFiles
