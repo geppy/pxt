@@ -68,13 +68,9 @@ interface IAppState {
     showParts?: boolean;
 }
 
-interface ExternalMessageData {
-    messageType: string;
-    args: any
-}
-interface ExternalMessageResult {
-    error?: any;
-    result?: any;
+interface ElectronMessage {
+    type: string;
+    args?: any
 }
 
 let isElectron = /[?&]electron=1/.test(window.location.href);
@@ -1698,22 +1694,8 @@ export class ProjectView extends data.Component<IAppProps, IAppState> {
     }
 
     checkForElectronUpdate() {
-        const errorMessage = lf("Unable to check for updates");
         pxt.tickEvent("menu.electronupdate");
-        Util.requestAsync({
-            url: "/api/externalmsg",
-            headers: { "Authorization": Cloud.localToken },
-            method: "POST",
-            data: {
-                messageType: "checkForUpdate"
-            } as ExternalMessageData
-        }).then((res: ExternalMessageResult) => {
-            if (res.error) {
-                core.errorNotification(errorMessage);
-            }
-        }).catch((e) => {
-            core.errorNotification(errorMessage);
-        });
+        sendElectronMessage("check-for-update");
     }
 
     embed() {
@@ -1934,6 +1916,165 @@ function initLogin() {
         }
         Cloud.localToken = pxt.storage.getLocal("local_token") || "";
     }
+}
+
+let electronSocket: WebSocket = null;
+function initElectron() {
+    if (!isElectron || !Cloud.isLocalHost() || !Cloud.localToken) {
+        return;
+    }
+
+    function showDownloading() {
+        setTimeout(function () {
+            core.showLoading(lf("Downloading update..."));
+        }, 1000);
+    }
+
+    function hideDownloading() {
+        core.hideLoading();
+    }
+
+    function onCriticalUpdate(args: any) {
+        core.confirmAsync({
+            header: lf("Critical update required"),
+            body: lf("To continue using {0}, you must update to the latest version.", args.appName),
+            agreeLbl: lf("Update"),
+            disagreeLbl: lf("Quit app"),
+            disagreeClass: "red",
+            size: "medium"
+        }).then(b => {
+            if (!b) {
+                pxt.tickEvent("update.refusedCritical");
+                sendElectronMessage("quit");
+            } else {
+                pxt.tickEvent("update.acceptedCritical");
+                showDownloading();
+                sendElectronMessage("update", {
+                    targetVersion: args.targetVersion,
+                    isCritical: true
+                });
+            }
+        });
+    }
+
+    function onUpdateAvailable(args: any) {
+        let header = lf("Version {0} available", args.targetVersion);
+
+        if (args.isBeta) {
+            header += " " + lf("(beta release)");
+        }
+
+        core.confirmAsync({
+            header,
+            body: lf("A new version of {0} is ready to download and install. The app will restart during the update. Update now?", args.appName || lf("the app")),
+            agreeLbl: lf("Update"),
+            disagreeLbl: lf("Not now"),
+            size: "medium"
+        }).then(b => {
+            if (!b) {
+                if (args.isInitialCheck) {
+                    pxt.tickEvent("update.refusedInitial");
+                } else {
+                    pxt.tickEvent("update.refused");
+                }
+            } else {
+                pxt.tickEvent("update.accepted");
+                showDownloading();
+                sendElectronMessage("update", {
+                    targetVersion: args.targetVersion
+                });
+            }
+        });
+    }
+
+    function onUpdateNotAvailable() {
+        core.confirmAsync({
+            body: lf("You are using the latest version available."),
+            header: lf("Good to go!"),
+            agreeLbl: lf("Ok"),
+            hideCancel: true
+        });
+    }
+
+    function onUpdateCheckError() {
+        displayUpdateError(lf("Unable to check for update"), lf("Ok"));
+    }
+
+    function onUpdateDownloadError(args: any) {
+        let isCritical = args && args.isCritical;
+
+        hideDownloading();
+        displayUpdateError(lf("There was an error downloading the update"), isCritical ? lf("Quit app") : lf("Ok"))
+            .finally(() => {
+                if (isCritical) {
+                    sendElectronMessage("quit");
+                }
+            });
+    }
+
+    function displayUpdateError(header: string, btnLabel: string) {
+        return core.confirmAsync({
+            header,
+            body: lf("Please ensure you are connected to the Internet and try again later."),
+            agreeClass: "red",
+            agreeIcon: "cancel",
+            agreeLbl: btnLabel,
+            hideCancel: true
+        });
+    }
+
+    pxt.log('initializing electron socket');
+    electronSocket = new WebSocket('ws://localhost:3233/' + Cloud.localToken + '/electron');
+    electronSocket.onopen = (ev) => {
+        pxt.log('electron: socket opened');
+        sendElectronMessage("ready");
+    }
+    electronSocket.onclose = (ev) => {
+        pxt.log('electron: socket closed');
+        electronSocket = null;
+    }
+    electronSocket.onmessage = (ev) => {
+        try {
+            let msg = JSON.parse(ev.data) as ElectronMessage;
+
+            switch (msg.type) {
+                case "critical-update":
+                    onCriticalUpdate(msg.args);
+                    break;
+                case "update-available":
+                    onUpdateAvailable(msg.args);
+                    break;
+                case "update-not-available":
+                    onUpdateNotAvailable();
+                    break;
+                case "update-check-error":
+                    onUpdateCheckError();
+                    break;
+                case "update-download-error":
+                    onUpdateDownloadError(msg.args);
+                    break;
+                default:
+                    pxt.debug('unknown electron message: ' + ev.data);
+                    break;
+            }
+        }
+        catch (e) {
+            pxt.debug('unknown electron message: ' + ev.data);
+        }
+    }
+}
+
+function sendElectronMessage(type: string, args?: any) {
+    if (!electronSocket) {
+        return;
+    }
+
+    let message: ElectronMessage = {
+        type: type,
+        args: args || void 0
+    };
+
+    electronSocket.send(JSON.stringify(message));
 }
 
 function initSerial() {
@@ -2178,6 +2319,7 @@ $(document).ready(() => {
         .then(() => {
             initSerial()
             initHashchange();
+            initElectron();
             switch (hash.cmd) {
                 case "sandbox":
                 case "pub":
