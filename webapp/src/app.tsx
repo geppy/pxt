@@ -59,6 +59,7 @@ interface IAppState {
     helpCardClick?: (e: React.MouseEvent) => boolean;
     sideDocsLoadUrl?: string; // set once to load the side docs frame
     sideDocsCollapsed?: boolean;
+    sideDocsPopOut?: boolean;
 
     running?: boolean;
     compiling?: boolean;
@@ -620,7 +621,7 @@ class SideDocs extends data.Component<ISettingsProps, {}> {
         const mode = this.props.parent.editor == this.props.parent.blocksEditor
             ? "blocks" : "js";
         const url = `${docsUrl}#doc:${path}:${mode}:${pxt.Util.localeInfo()}`;
-        this.setUrl(url);
+        this.setUrl(url, true);
     }
 
     setMarkdown(md: string) {
@@ -628,14 +629,14 @@ class SideDocs extends data.Component<ISettingsProps, {}> {
         const mode = this.props.parent.editor == this.props.parent.blocksEditor
             ? "blocks" : "js";
         const url = `${docsUrl}#md:${encodeURIComponent(md)}:${mode}:${pxt.Util.localeInfo()}`;
-        this.setUrl(url);
+        this.setUrl(url, false);
     }
 
-    private setUrl(url: string) {
+    private setUrl(url: string, popOut: boolean) {
         let el = document.getElementById("sidedocs") as HTMLIFrameElement;
         if (el) el.src = url;
         else this.props.parent.setState({ sideDocsLoadUrl: url });
-        this.props.parent.setState({ sideDocsCollapsed: false });
+        this.props.parent.setState({ sideDocsCollapsed: false, sideDocsPopOut: popOut });
     }
 
     collapse() {
@@ -665,9 +666,10 @@ class SideDocs extends data.Component<ISettingsProps, {}> {
         const icon = !docsUrl || state.sideDocsCollapsed ? "expand" : "compress";
         return <div>
             <iframe id="sidedocs" src={docsUrl} role="complementary" sandbox="allow-scripts allow-same-origin allow-popups" />
+            { state.sideDocsPopOut ?
             <button id="sidedocspopout" role="button" title={lf("Open documentation in new tab") } className={`circular ui icon button ${state.sideDocsCollapsed ? "hidden" : ""}`} onClick={() => this.popOut() }>
                 <i className={`external icon`}></i>
-            </button>
+            </button> : undefined }
             <button id="sidedocsexpand" role="button" title={lf("Show/Hide side documentation") } className="circular ui icon button" onClick={() => this.toggleVisibility() }>
                 <i className={`${icon} icon`}></i>
             </button>
