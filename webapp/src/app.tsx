@@ -1568,6 +1568,18 @@ export class ProjectView extends data.Component<IAppProps, IAppState> {
             this.editor.beforeCompile();
         }
 
+        if (this.editor == this.blocksEditor) {
+            const md =
+                `#                 
+## JavaScript
+
+\`\`\`
+${pkg.mainPkg.readFile("main.ts") || ''}
+\`\`\`
+`
+            this.setSideMarkdown(md);
+        }
+
         this.stopSimulator();
         this.clearLog();
 
