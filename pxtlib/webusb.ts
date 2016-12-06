@@ -265,6 +265,8 @@ namespace pxt.usb {
         private lock = new U.PromiseQueue();
         infoRaw: string;
         info: BootloaderInfo;
+        pageSize: number;
+        bootloaderMode = false;
 
         onSerial = (buf: Uint8Array) => { };
 
@@ -354,6 +356,24 @@ namespace pxt.usb {
             return this.lock.enqueue("out", () => loop(0))
         }
 
+        flashAsync(blocks: pxtc.UF2.Block[]) {
+            U.assert(this.bootloaderMode)
+            let loopAsync = (pos: number): Promise<void> => {
+                if (pos >= blocks.length)
+                    return Promise.resolve()
+                let b = blocks[pos]
+                U.assert(b.payloadSize == this.pageSize)
+                let buf = new Uint8Array(4 + b.payloadSize)
+                write32(buf, 0, b.targetAddr)
+                U.memcpy(buf, 4, b.data, 0, b.payloadSize)
+                return this.talkAsync(HF2_CMD_WRITE_FLASH_PAGE, buf)
+                    .then(() => loopAsync(pos + 1))
+            }
+            return loopAsync(0)
+                .then(() => this.talkAsync(HF2_CMD_RESET_INTO_APP))
+                .then(() => { })
+        }
+
         initAsync() {
             return super.initAsync()
                 .then(() => this.talkAsync(HF2_CMD_INFO))
@@ -366,12 +386,17 @@ namespace pxt.usb {
                             return ""
                         })
                     this.info = info
-                    let m = /(v\d\S+)\s+(\S+)/.exec(this.info.Header)
+                    let m = /v(\d\S+)\s+(\S+)/.exec(this.info.Header)
                     this.info.Parsed = {
                         Version: m[1],
                         Features: m[2],
                     }
                     console.log("Device connected", this.info)
+                    return this.talkAsync(HF2_CMD_BININFO)
+                })
+                .then(binfo => {
+                    this.bootloaderMode = binfo[0] == 1;
+                    this.pageSize = read32(binfo, 4)
                 })
         }
 

@@ -99,6 +99,11 @@ namespace ts.pxtc.Util {
         return !!v && typeof v === "object" && !Array.isArray(v)
     }
 
+    export function memcpy(trg: Uint8Array, trgOff: number, src: Uint8Array, srcOff: number, len: number) {
+        for (let i = 0; i < len; ++i)
+            trg[trgOff + i] = src[srcOff + i]
+    }
+
     export function jsonMergeFrom(trg: any, src: any) {
         if (!src) return;
         Object.keys(src).forEach(k => {
@@ -562,7 +567,7 @@ namespace ts.pxtc.Util {
     }
 
     export function downloadLiveTranslationsAsync(lang: string, filename: string) {
-            return Util.httpGetJsonAsync(`https://www.pxt.io/api/translations?lang=${encodeURIComponent(lang)}&filename=${encodeURIComponent(filename)}`);
+        return Util.httpGetJsonAsync(`https://www.pxt.io/api/translations?lang=${encodeURIComponent(lang)}&filename=${encodeURIComponent(filename)}`);
     }
 
     export function updateLocalizationAsync(baseUrl: string, code: string, live?: boolean): Promise<any> {
