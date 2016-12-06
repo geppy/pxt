@@ -114,12 +114,13 @@ namespace pxt.usb {
                 })
         }
 
-        recvRawPacketAsync() {
+        recvRawPacketAsync(): Promise<Uint8Array> {
             return this.dev.transferIn(this.epIn.endpointNumber, 64)
                 .then(res => {
                     if (res.status != "ok")
                         this.error("USB IN transfer failed")
-                    return new Uint8Array(res.data)
+                    let arr = new Uint8Array(res.data.buffer)
+                    return arr
                 })
         }
 
@@ -130,7 +131,9 @@ namespace pxt.usb {
                 .then(() => dev.selectConfiguration(1))
                 .then(() => {
                     let isHID = (iface: USBInterface) =>
-                        iface.alternates[0].interfaceClass == 3;
+                        iface.alternates[0].interfaceClass == 0xff &&
+                        iface.alternates[0].interfaceSubclass == 42 &&
+                        iface.alternates[0].endpoints[0].type == "interrupt";
                     let hid = dev.configurations[0].interfaces.filter(isHID)[0]
                     if (!hid)
                         this.error("cannot find USB HID interface")
@@ -141,8 +144,7 @@ namespace pxt.usb {
                     Util.assert(this.epOut.packetSize == 64);
                     Util.assert(this.epIn.type == "interrupt");
                     Util.assert(this.epOut.type == "interrupt");
-                    console.log(dev)
-                    pxt.debug("claiming interface " + hid.interfaceNumber)
+                    //console.log("USB-device", dev)
                     return dev.claimInterface(hid.interfaceNumber)
                 })
         }
@@ -157,7 +159,7 @@ namespace pxt.usb {
     }
 
     export interface USBInTransferResult {
-        data: ArrayBuffer;
+        data: { buffer: ArrayBuffer; };
         status: USBTransferStatus;
     }
 
@@ -242,6 +244,18 @@ namespace pxt.usb {
         return buf[pos] | (buf[pos + 1] << 8)
     }
 
+    export interface BootloaderInfo {
+        Header: string;
+        Parsed: {
+            Version: string;
+            Features: string;
+        };
+        VersionParsed: string;
+        Model: string;
+        BoardID: string;
+        FlashSize: string;
+    }
+
     export class HF2 extends HID {
         private cmdSeq = 0;
         constructor(d: USBDevice) {
@@ -249,7 +263,8 @@ namespace pxt.usb {
         }
 
         private lock = new U.PromiseQueue();
-        info: string;
+        infoRaw: string;
+        info: BootloaderInfo;
 
         onSerial = (buf: Uint8Array) => { };
 
@@ -343,8 +358,20 @@ namespace pxt.usb {
             return super.initAsync()
                 .then(() => this.talkAsync(HF2_CMD_INFO))
                 .then(buf => {
-                    this.info = U.fromUTF8(U.uint8ArrayToString(buf))
-                    console.log("Device connected, " + this.info)
+                    this.infoRaw = U.fromUTF8(U.uint8ArrayToString(buf));
+                    let info = {} as any
+                    ("Header: " + this.infoRaw).replace(/^([\w\-]+):\s*([^\n\r]*)/mg,
+                        (f, n, v) => {
+                            info[n.replace(/-/g, "")] = v
+                            return ""
+                        })
+                    this.info = info
+                    let m = /(v\d\S+)\s+(\S+)/.exec(this.info.Header)
+                    this.info.Parsed = {
+                        Version: m[1],
+                        Features: m[2],
+                    }
+                    console.log("Device connected", this.info)
                 })
         }
 
