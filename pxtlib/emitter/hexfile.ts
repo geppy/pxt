@@ -66,8 +66,8 @@ namespace ts.pxtc {
 
         export function parseFile(blocks: Uint8Array) {
             let r: Block[] = []
-            for (let i = 0; i < blocks.length; i += 256) {
-                let b = parseBlock(blocks.slice(i * 256, i * 256 + 256))
+            for (let i = 0; i < blocks.length; i += 512) {
+                let b = parseBlock(blocks.slice(i, i + 512))
                 if (b) r.push(b)
             }
             return r

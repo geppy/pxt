@@ -120,6 +120,8 @@ namespace pxt.usb {
                     if (res.status != "ok")
                         this.error("USB IN transfer failed")
                     let arr = new Uint8Array(res.data.buffer)
+                    if (arr.length == 0)
+                        return this.recvRawPacketAsync()
                     return arr
                 })
         }
@@ -187,17 +189,24 @@ namespace pxt.usb {
         packets: USBIsochronousOutTransferPacket[];
     }
 
-    export function requestDeviceAsync(): Promise<USBDevice> {
+    function requestDeviceAsync(): Promise<USBDevice> {
         return (navigator as any).usb.requestDevice({ filters: [] })
     }
 
-    export function hf2Async() {
+    function hf2Async() {
         return requestDeviceAsync()
             .then(dev => {
                 let d = new HF2(dev)
                 return d.initAsync()
                     .then(() => d)
             })
+    }
+
+    let initPromise: Promise<HF2>
+    export function initAsync() {
+        if (!initPromise)
+            initPromise = hf2Async()
+        return initPromise
     }
 
     const HF2_FLAG_PKT_LAST = 0xC0
@@ -370,8 +379,12 @@ namespace pxt.usb {
                     .then(() => loopAsync(pos + 1))
             }
             return loopAsync(0)
-                .then(() => this.talkAsync(HF2_CMD_RESET_INTO_APP))
-                .then(() => { })
+                .then(() =>
+                    this.talkAsync(HF2_CMD_RESET_INTO_APP)
+                        .catch(e => { }))
+                .then(() => {
+                    initPromise = null
+                })
         }
 
         initAsync() {

@@ -119,7 +119,7 @@ function webusbDeployCoreAsync(resp: pxtc.CompileResult): Promise<void> {
     core.infoNotification(lf("Flashing device..."));
     let f = resp.outfiles[pxtc.BINARY_UF2]
     let blocks = pxtc.UF2.parseFile(Util.stringToUint8Array(atob(f)))
-    return pxt.usb.hf2Async()
+    return pxt.usb.initAsync()
         .then(dev => dev.flashAsync(blocks))
 }
 
