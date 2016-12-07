@@ -2074,7 +2074,10 @@ function sendElectronMessage(type: string, args?: any) {
         args: args || void 0
     };
 
-    electronSocket.send(JSON.stringify(message));
+    // setTimeout used to smoothen the UI animations a bit, because the first message sent to the web socket hangs the app briefly 
+    setTimeout(function () {
+      electronSocket.send(JSON.stringify(message));
+    }, 150);
 }
 
 function initSerial() {
