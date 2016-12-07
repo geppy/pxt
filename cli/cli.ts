@@ -1565,7 +1565,7 @@ export function serveAsync(parsed: commandParser.ParsedCommand) {
             autoStart: !globalConfig.noAutoStart,
             packaged: packaged,
             electron: !!parsed.flags["electron"],
-            externalHandlers: electronHandlers || void 0,
+            electronHandlers: electronHandlers || void 0,
             port: parsed.flags["port"] as number || 0,
             browser: parsed.flags["browser"] as string
         }))

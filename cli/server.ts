@@ -23,7 +23,7 @@ let userProjectsDir = path.join(process.cwd(), userProjectsDirName);
 let docsDir = ""
 let packagedDir = ""
 let localHexDir = path.join("built", "hexcache");
-let externalMessageHandlers: pxt.Map<ElectronHandler> = {};
+let electronHandlers: pxt.Map<ElectronHandler> = {};
 
 export function forkPref() {
     if (pxt.appTarget.forkof)
@@ -488,8 +488,8 @@ function initSocketServer() {
                 electronPendingMessages.forEach((m) => {
                     sendElectronMessage(m);
                 });
-            } else if (externalMessageHandlers[messageInfo.type]) {
-                externalMessageHandlers[messageInfo.type](messageInfo.args);
+            } else if (electronHandlers[messageInfo.type]) {
+                electronHandlers[messageInfo.type](messageInfo.args);
             }
         });
         electronSocket.on('close', function (event: any) {
@@ -677,7 +677,7 @@ export interface ServeOptions {
     packaged?: boolean;
     electron?: boolean;
     browser?: string;
-    externalHandlers?: pxt.Map<ElectronHandler>;
+    electronHandlers?: pxt.Map<ElectronHandler>;
     port?: number;
 }
 
@@ -697,8 +697,8 @@ export function serveAsync(options: ServeOptions) {
     setupRootDir();
     initSerialMonitor();
 
-    if (serveOptions.externalHandlers) {
-        externalMessageHandlers = serveOptions.externalHandlers;
+    if (serveOptions.electronHandlers) {
+        electronHandlers = serveOptions.electronHandlers;
     }
 
     let server = http.createServer((req, res) => {

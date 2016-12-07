@@ -1925,9 +1925,7 @@ function initElectron() {
     }
 
     function showDownloading() {
-        setTimeout(function () {
-            core.showLoading(lf("Downloading update..."));
-        }, 1000);
+        core.showLoading(lf("Downloading update..."));
     }
 
     function hideDownloading() {
@@ -1937,7 +1935,7 @@ function initElectron() {
     function onCriticalUpdate(args: any) {
         core.confirmAsync({
             header: lf("Critical update required"),
-            body: lf("To continue using {0}, you must update to the latest version.", args.appName),
+            body: lf("To continue using {0}, you must update to the latest version.", args.appName || lf("this app")),
             agreeLbl: lf("Update"),
             disagreeLbl: lf("Quit app"),
             disagreeClass: "red",
@@ -1966,7 +1964,7 @@ function initElectron() {
 
         core.confirmAsync({
             header,
-            body: lf("A new version of {0} is ready to download and install. The app will restart during the update. Update now?", args.appName || lf("the app")),
+            body: lf("A new version of {0} is ready to download and install. The app will restart during the update. Update now?", args.appName || lf("this app")),
             agreeLbl: lf("Update"),
             disagreeLbl: lf("Not now"),
             size: "medium"
@@ -2074,9 +2072,9 @@ function sendElectronMessage(type: string, args?: any) {
         args: args || void 0
     };
 
-    // setTimeout used to smoothen the UI animations a bit, because the first message sent to the web socket hangs the app briefly 
+    // Sending messages to the web socket sometimes hangs the app briefly; use setTimeout to smoothen the UI animations a bit 
     setTimeout(function () {
-      electronSocket.send(JSON.stringify(message));
+        electronSocket.send(JSON.stringify(message));
     }, 150);
 }
 
