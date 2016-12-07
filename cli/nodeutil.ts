@@ -34,7 +34,7 @@ export function setTargetDir(dir: string) {
 
     if (fallback || !target.pxtCoreDir || !fs.existsSync(target.pxtCoreDir)) {
         pxtCoreDir = path.join(__dirname, "..");
-        
+
         if (pxtCoreDir !== targetDir) {
             pxt.log("Could not determine target's pxt-core location, falling back to default: " + pxtCoreDir);
         }
